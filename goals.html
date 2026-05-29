@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Savings goals</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f5f4f0; min-height: 100vh; padding: 2rem 1rem; }
+  h1 { font-size: 1.4rem; font-weight: 600; color: #1a1a1a; text-align: center; margin-bottom: 0.2rem; }
+  .sub { font-size: 13px; color: #999; text-align: center; margin-bottom: 0.75rem; }
+  .sync-status { font-size: 12px; margin-bottom: 1.5rem; padding: 4px 14px; border-radius: 999px; display: block; text-align: center; }
+  .sync-status.loading{background:#fff8e1;color:#a07000}.sync-status.saved{background:#e8f5ee;color:#2d7a4f}.sync-status.saving{background:#e8f0fe;color:#1a5fa8}.sync-status.error{background:#fdecea;color:#c03030}
+  .goals-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap: 14px; max-width: 700px; margin: 0 auto 1.5rem; }
+  .goal-card { background: #fff; border: 0.5px solid #ddd; border-radius: 14px; padding: 1.25rem 1rem; }
+  .goal-icon { font-size: 28px; margin-bottom: 8px; }
+  .goal-name { font-size: 14px; font-weight: 600; color: #1a1a1a; margin-bottom: 4px; }
+  .goal-amounts { font-size: 12px; color: #999; margin-bottom: 10px; }
+  .goal-amounts span { font-weight: 600; color: #2d7a4f; }
+  .bar-wrap { background: #e0ded8; border-radius: 999px; height: 7px; margin-bottom: 10px; overflow: hidden; }
+  .bar { height: 100%; border-radius: 999px; transition: width 0.3s; }
+  .goal-actions { display: flex; gap: 6px; }
+  .goal-actions input { flex:1; padding: 6px 8px; border: 1px solid #ddd; border-radius: 7px; font-size: 12px; outline: none; font-family: inherit; }
+  .goal-actions input:focus { border-color: #2d7a4f; }
+  .goal-actions button { color: #fff; border: none; border-radius: 7px; padding: 6px 10px; font-size: 12px; cursor: pointer; font-family: inherit; }
+  .del-goal { background: none; border: none; color: #ddd; cursor: pointer; font-size: 18px; float: right; }
+  .del-goal:hover { color: #c03030; }
+  .pct { font-size: 11px; color: #aaa; text-align: right; margin-bottom: 4px; }
+  .done-badge { background: #e8f5ee; color: #2d7a4f; border-radius: 999px; font-size: 11px; font-weight: 600; padding: 2px 10px; display: inline-block; margin-bottom: 8px; }
+  .add-form { background: #fff; border: 0.5px solid #ddd; border-radius: 12px; padding: 1.25rem; max-width: 700px; margin: 0 auto; }
+  .add-form h3 { font-size: 14px; font-weight: 600; color: #1a1a1a; margin-bottom: 12px; }
+  .add-row { display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 8px; }
+  input[type="text"],input[type="number"] { padding: 8px 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 13px; font-family: inherit; outline: none; width: 100%; }
+  input:focus { border-color: #2d7a4f; }
+  .add-btn { background: #2d7a4f; color: #fff; border: none; border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer; font-family: inherit; }
+  .add-btn:hover { background: #235f3d; }
+  .empty { text-align: center; color: #bbb; font-size: 13px; padding: 2rem 0; }
+  .overlay { position: fixed; inset: 0; background: rgba(245,244,240,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; font-size: 15px; color: #999; }
+  .spinner { width: 32px; height: 32px; border: 3px solid #ddd; border-top-color: #2d7a4f; border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="overlay" id="overlay"><div class="spinner"></div>Loading your data…</div>
+<h1>Savings goals</h1>
+<p class="sub">Create jars for each thing you're saving toward</p>
+<div class="sync-status saved" id="sync-status">✓ Synced</div>
+<div class="goals-grid" id="goals-grid"></div>
+<div class="add-form">
+  <h3>New goal</h3>
+  <div class="add-row">
+    <input type="text" id="f-name" placeholder="Goal name (e.g. Vacation)" />
+    <input type="text" id="f-icon" placeholder="Icon e.g. ✈️" />
+    <input type="number" id="f-target" placeholder="Target amount" min="1" />
+    <button class="add-btn" id="add-btn">+ Add</button>
+  </div>
+</div>
+<script src="sync.js"></script>
+<script>
+const TOOL='goals', COLORS=['#2d7a4f','#1a5fa8','#a05c00','#7a2d6f','#c03030','#1a7a6e'];
+let goals=[], triggerSave;
+function setSyncStatus(s){const el=document.getElementById('sync-status');const map={saving:'↑ Saving…',saved:'✓ Synced',error:'⚠ Sync failed',loading:'⟳ Loading…'};el.textContent=map[s]||s;el.className='sync-status '+s;}
+function render(){
+  const grid=document.getElementById('goals-grid');
+  if(!goals.length){grid.innerHTML='<div class="empty">No goals yet — add one below</div>';return;}
+  grid.innerHTML='';
+  goals.forEach((g,i)=>{
+    const pct=Math.min(100,Math.round(g.saved/g.target*100)),color=COLORS[i%COLORS.length],done=g.saved>=g.target;
+    const card=document.createElement('div');card.className='goal-card';
+    card.innerHTML=`<button class="del-goal" data-i="${i}">×</button><div class="goal-icon">${g.icon||'💰'}</div><div class="goal-name">${g.name}</div>${done?'<div class="done-badge">Goal reached!</div>':''}<div class="goal-amounts">Saved: <span>${parseFloat(g.saved).toFixed(2)}</span> / ${parseFloat(g.target).toFixed(2)}</div><div class="pct">${pct}%</div><div class="bar-wrap"><div class="bar" style="width:${pct}%;background:${color}"></div></div>${!done?`<div class="goal-actions"><input type="number" placeholder="Add amount" min="0" class="add-input" data-i="${i}"/><button class="save-btn" data-i="${i}" style="background:${color}">+</button></div>`:''}`;
+    grid.appendChild(card);
+  });
+  grid.querySelectorAll('.save-btn').forEach(btn=>btn.addEventListener('click',()=>{
+    const i=parseInt(btn.dataset.i),inp=grid.querySelector(`.add-input[data-i="${i}"]`),val=parseFloat(inp.value);
+    if(!val||val<=0)return;goals[i].saved=Math.min(goals[i].target,goals[i].saved+val);inp.value='';triggerSave();render();
+  }));
+  grid.querySelectorAll('.del-goal').forEach(btn=>btn.addEventListener('click',()=>{goals.splice(parseInt(btn.dataset.i),1);triggerSave();render();}));
+}
+document.getElementById('add-btn').addEventListener('click',()=>{
+  const name=document.getElementById('f-name').value.trim(),target=parseFloat(document.getElementById('f-target').value);
+  if(!name||!target||target<=0)return;
+  goals.push({name,icon:document.getElementById('f-icon').value.trim()||'💰',target,saved:0});
+  document.getElementById('f-name').value='';document.getElementById('f-icon').value='';document.getElementById('f-target').value='';
+  triggerSave();render();
+});
+async function init(){
+  setSyncStatus('loading');
+  try{const d=await cloudLoad(TOOL,[]);goals=Array.isArray(d)?d:[];setSyncStatus('saved');}catch(e){setSyncStatus('error');}
+  const ds=makeDebouncedSave(TOOL,()=>goals);
+  triggerSave=()=>{setSyncStatus('saving');ds();setTimeout(()=>setSyncStatus('saved'),2000);};
+  render();document.getElementById('overlay').style.display='none';
+}
+init();
+</script>
+</body>
+</html>

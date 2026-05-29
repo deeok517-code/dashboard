@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Habit tracker</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',system-ui,sans-serif;background:#f5f4f0;min-height:100vh;padding:2rem 1rem}
+  h1{font-size:1.4rem;font-weight:600;color:#1a1a1a;text-align:center;margin-bottom:.2rem}.sub{font-size:13px;color:#999;text-align:center;margin-bottom:.75rem}
+  .sync-status{font-size:12px;margin-bottom:1rem;padding:4px 14px;border-radius:999px;display:block;text-align:center}
+  .sync-status.loading{background:#fff8e1;color:#a07000}.sync-status.saved{background:#e8f5ee;color:#2d7a4f}.sync-status.saving{background:#e8f0fe;color:#1a5fa8}.sync-status.error{background:#fdecea;color:#c03030}
+  .month-nav{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:1.5rem}
+  .month-nav button{background:#fff;border:.5px solid #ddd;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:14px;font-family:inherit}
+  .month-label{font-size:15px;font-weight:600;color:#1a1a1a;min-width:140px;text-align:center}
+  .table-wrap{overflow-x:auto;max-width:100%;margin-bottom:1.5rem}
+  table{border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;border:.5px solid #ddd;min-width:400px}
+  th{font-size:11px;color:#999;font-weight:500;padding:8px 6px;text-align:center;border-bottom:.5px solid #eee}
+  th.habit-col{text-align:left;padding-left:14px;min-width:130px}
+  td{padding:6px;text-align:center;border-bottom:.5px solid #f0f0f0}
+  td.habit-name{text-align:left;padding-left:14px;font-size:13px;font-weight:500;color:#1a1a1a;white-space:nowrap}
+  td.habit-pct{font-size:12px;color:#999;padding-right:10px}
+  .dot{width:22px;height:22px;border-radius:50%;border:1.5px solid #ddd;cursor:pointer;margin:auto;transition:all .15s;display:flex;align-items:center;justify-content:center}
+  .dot:hover{border-color:#2d7a4f}.dot.done{background:#2d7a4f;border-color:#2d7a4f}.dot.today{border-color:#1a5fa8}.dot.future{opacity:.3;pointer-events:none}
+  .del-row{background:none;border:none;color:#ddd;cursor:pointer;font-size:16px;padding:0 4px}.del-row:hover{color:#c03030}
+  .add-form{background:#fff;border:.5px solid #ddd;border-radius:10px;padding:1rem;max-width:400px;margin:0 auto;display:flex;gap:8px}
+  input[type="text"]{flex:1;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;outline:none}
+  input:focus{border-color:#2d7a4f}
+  .add-btn{background:#2d7a4f;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;font-family:inherit}.add-btn:hover{background:#235f3d}
+  .empty{text-align:center;color:#bbb;font-size:13px;padding:2rem 0}
+  .overlay{position:fixed;inset:0;background:rgba(245,244,240,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;font-size:15px;color:#999}
+  .spinner{width:32px;height:32px;border:3px solid #ddd;border-top-color:#2d7a4f;border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="overlay" id="overlay"><div class="spinner"></div>Loading your data…</div>
+<h1>Habit tracker</h1>
+<p class="sub">Tick each day you complete a habit</p>
+<div class="sync-status saved" id="sync-status">✓ Synced</div>
+<div class="month-nav">
+  <button id="prev-btn">&#8592;</button>
+  <div class="month-label" id="month-label"></div>
+  <button id="next-btn">&#8594;</button>
+</div>
+<div class="table-wrap" id="table-wrap"></div>
+<div class="add-form">
+  <input type="text" id="f-habit" placeholder="New habit (e.g. Exercise)" />
+  <button class="add-btn" id="add-btn">+ Add</button>
+</div>
+<script src="sync.js"></script>
+<script>
+const TOOL='habits';
+let data={habits:[],done:{}},cur=new Date();cur.setDate(1);
+let triggerSave;
+const today=new Date();
+const monthKey=()=>cur.getFullYear()+'-'+String(cur.getMonth()+1).padStart(2,'0');
+const monthName=()=>cur.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+function setSyncStatus(s){const el=document.getElementById('sync-status');const map={saving:'↑ Saving…',saved:'✓ Synced',error:'⚠ Sync failed',loading:'⟳ Loading…'};el.textContent=map[s]||s;el.className='sync-status '+s;}
+function daysInMonth(y,m){return new Date(y,m+1,0).getDate();}
+function render(){
+  document.getElementById('month-label').textContent=monthName();
+  const mk=monthKey();if(!data.done[mk])data.done[mk]={};
+  const done=data.done[mk],days=daysInMonth(cur.getFullYear(),cur.getMonth()),wrap=document.getElementById('table-wrap');
+  if(!data.habits.length){wrap.innerHTML='<div class="empty">No habits yet — add one below</div>';return;}
+  let html='<table><thead><tr><th class="habit-col">Habit</th>';
+  for(let d=1;d<=days;d++)html+=`<th>${d}</th>`;
+  html+='<th>%</th><th></th></tr></thead><tbody>';
+  const isCurrentMonth=cur.getFullYear()===today.getFullYear()&&cur.getMonth()===today.getMonth();
+  const maxDay=isCurrentMonth?today.getDate():days;
+  data.habits.forEach((h,hi)=>{
+    let doneCount=0;
+    html+=`<tr><td class="habit-name">${h}</td>`;
+    for(let d=1;d<=days;d++){
+      const k=hi+'_'+d,isDone=!!done[k],isToday=isCurrentMonth&&d===today.getDate(),isFuture=isCurrentMonth&&d>today.getDate();
+      if(isDone)doneCount++;
+      let cls='dot'+(isDone?' done':'')+(isToday?' today':'')+(isFuture?' future':'');
+      html+=`<td><div class="${cls}" data-hi="${hi}" data-d="${d}"></div></td>`;
+    }
+    const pct=maxDay>0?Math.round(doneCount/maxDay*100):0;
+    html+=`<td class="habit-pct">${pct}%</td><td><button class="del-row" data-hi="${hi}">×</button></td></tr>`;
+  });
+  html+='</tbody></table>';wrap.innerHTML=html;
+  wrap.querySelectorAll('.dot:not(.future)').forEach(dot=>dot.addEventListener('click',()=>{
+    const k=dot.dataset.hi+'_'+dot.dataset.d;done[k]=!done[k];triggerSave();render();
+  }));
+  wrap.querySelectorAll('.del-row').forEach(btn=>btn.addEventListener('click',()=>{data.habits.splice(parseInt(btn.dataset.hi),1);triggerSave();render();}));
+}
+document.getElementById('add-btn').addEventListener('click',()=>{
+  const h=document.getElementById('f-habit').value.trim();if(!h)return;
+  data.habits.push(h);document.getElementById('f-habit').value='';triggerSave();render();
+});
+document.getElementById('prev-btn').addEventListener('click',()=>{cur.setMonth(cur.getMonth()-1);render();});
+document.getElementById('next-btn').addEventListener('click',()=>{cur.setMonth(cur.getMonth()+1);render();});
+async function init(){
+  setSyncStatus('loading');
+  try{const d=await cloudLoad(TOOL,{habits:[],done:{}});data=d;if(!data.habits)data.habits=[];if(!data.done)data.done={};setSyncStatus('saved');}catch(e){setSyncStatus('error');}
+  const ds=makeDebouncedSave(TOOL,()=>data);
+  triggerSave=()=>{setSyncStatus('saving');ds();setTimeout(()=>setSyncStatus('saved'),2000);};
+  render();document.getElementById('overlay').style.display='none';
+}
+init();
+</script>
+</body>
+</html>

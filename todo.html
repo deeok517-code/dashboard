@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>To-do list</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',system-ui,sans-serif;background:#f5f4f0;min-height:100vh;padding:2rem 1rem;display:flex;flex-direction:column;align-items:center}
+  h1{font-size:1.4rem;font-weight:600;color:#1a1a1a;margin-bottom:.2rem}.sub{font-size:13px;color:#999;margin-bottom:.5rem}
+  .sync-status{font-size:12px;margin-bottom:1rem;padding:4px 14px;border-radius:999px;display:inline-block}
+  .sync-status.loading{background:#fff8e1;color:#a07000}.sync-status.saved{background:#e8f5ee;color:#2d7a4f}.sync-status.saving{background:#e8f0fe;color:#1a5fa8}.sync-status.error{background:#fdecea;color:#c03030}
+  .wrap{width:100%;max-width:500px}
+  .add-form{display:flex;gap:8px;margin-bottom:1rem}
+  input[type="text"]{flex:1;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;outline:none;background:#fff}input:focus{border-color:#2d7a4f}
+  .add-btn{background:#2d7a4f;color:#fff;border:none;border-radius:8px;padding:10px 16px;font-size:14px;cursor:pointer;font-family:inherit}.add-btn:hover{background:#235f3d}
+  .filters{display:flex;gap:6px;margin-bottom:12px}
+  .filter-btn{background:#fff;border:.5px solid #ddd;border-radius:999px;padding:5px 14px;font-size:12px;cursor:pointer;font-family:inherit;color:#666}.filter-btn.active{background:#2d7a4f;border-color:#2d7a4f;color:#fff}
+  .stat-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:#999;margin-bottom:10px}.stat-row span{font-weight:600;color:#1a1a1a}
+  .clear-done{background:none;border:none;font-size:12px;color:#bbb;cursor:pointer;font-family:inherit}.clear-done:hover{color:#c03030}
+  .todo-item{background:#fff;border:.5px solid #ddd;border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px;margin-bottom:6px}
+  .todo-item.done-item{opacity:.6}
+  .check{width:22px;height:22px;border-radius:50%;border:1.5px solid #ccc;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-size:13px}.check:hover{border-color:#2d7a4f}
+  .todo-item.done-item .check{background:#2d7a4f;border-color:#2d7a4f;color:#fff}
+  .todo-text{flex:1;font-size:14px;color:#1a1a1a}.todo-item.done-item .todo-text{text-decoration:line-through;color:#aaa}
+  .todo-date{font-size:11px;color:#ccc;white-space:nowrap}
+  .del-btn{background:none;border:none;color:#ddd;cursor:pointer;font-size:18px}.del-btn:hover{color:#c03030}
+  .empty{text-align:center;color:#ccc;font-size:13px;padding:2rem 0}
+  .overlay{position:fixed;inset:0;background:rgba(245,244,240,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;font-size:15px;color:#999}
+  .spinner{width:32px;height:32px;border:3px solid #ddd;border-top-color:#2d7a4f;border-radius:50%;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="overlay" id="overlay"><div class="spinner"></div>Loading your data…</div>
+<h1>To-do list</h1><p class="sub">Your tasks, saved everywhere</p>
+<div class="sync-status saved" id="sync-status">✓ Synced</div>
+<div class="wrap">
+  <div class="add-form"><input type="text" id="f-task" placeholder="Add a task…"/><button class="add-btn" id="add-btn">Add</button></div>
+  <div class="filters"><button class="filter-btn active" data-f="all">All</button><button class="filter-btn" data-f="active">Active</button><button class="filter-btn" data-f="done">Done</button></div>
+  <div class="stat-row"><span id="stat-left">0</span> left<button class="clear-done" id="clear-done">Clear completed</button></div>
+  <div id="todo-list"></div>
+</div>
+<script src="sync.js"></script>
+<script>
+const TOOL='todos';
+let todos=[],filter='all',triggerSave;
+function setSyncStatus(s){const el=document.getElementById('sync-status');const map={saving:'↑ Saving…',saved:'✓ Synced',error:'⚠ Sync failed',loading:'⟳ Loading…'};el.textContent=map[s]||s;el.className='sync-status '+s;}
+function uid(){return Date.now()+Math.random().toString(36).slice(2);}
+function fmt(ts){return new Date(ts).toLocaleDateString('en-US',{month:'short',day:'numeric'});}
+function render(){
+  document.getElementById('stat-left').textContent=todos.filter(t=>!t.done).length;
+  const visible=todos.filter(t=>filter==='all'?true:filter==='done'?t.done:!t.done);
+  const list=document.getElementById('todo-list');
+  if(!visible.length){list.innerHTML='<div class="empty">Nothing here</div>';return;}
+  list.innerHTML='';
+  visible.forEach(t=>{
+    const div=document.createElement('div');div.className='todo-item'+(t.done?' done-item':'');
+    div.innerHTML=`<div class="check" data-id="${t.id}">${t.done?'✓':''}</div><div class="todo-text">${t.text}</div><div class="todo-date">${fmt(t.created)}</div><button class="del-btn" data-id="${t.id}">×</button>`;
+    div.querySelector('.check').addEventListener('click',()=>{const td=todos.find(x=>x.id===t.id);if(td){td.done=!td.done;triggerSave();render();}});
+    div.querySelector('.del-btn').addEventListener('click',()=>{todos=todos.filter(x=>x.id!==t.id);triggerSave();render();});
+    list.appendChild(div);
+  });
+}
+document.getElementById('add-btn').addEventListener('click',()=>{
+  const text=document.getElementById('f-task').value.trim();if(!text)return;
+  todos.unshift({id:uid(),text,done:false,created:Date.now()});document.getElementById('f-task').value='';triggerSave();render();
+});
+document.getElementById('f-task').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('add-btn').click();});
+document.getElementById('clear-done').addEventListener('click',()=>{todos=todos.filter(t=>!t.done);triggerSave();render();});
+document.querySelectorAll('.filter-btn').forEach(btn=>btn.addEventListener('click',()=>{filter=btn.dataset.f;document.querySelectorAll('.filter-btn').forEach(b=>b.classList.toggle('active',b===btn));render();}));
+async function init(){
+  setSyncStatus('loading');
+  try{const d=await cloudLoad(TOOL,[]);todos=Array.isArray(d)?d:[];setSyncStatus('saved');}catch(e){setSyncStatus('error');}
+  const ds=makeDebouncedSave(TOOL,()=>todos);
+  triggerSave=()=>{setSyncStatus('saving');ds();setTimeout(()=>setSyncStatus('saved'),2000);};
+  render();document.getElementById('overlay').style.display='none';
+}
+init();
+</script>
+</body>
+</html>

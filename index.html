@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Dashboard</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f5f4f0; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+  #login-screen { background: #fff; border: 0.5px solid #ddd; border-radius: 16px; padding: 2.5rem 2rem; width: 100%; max-width: 340px; text-align: center; }
+  #login-screen h1 { font-size: 1.3rem; font-weight: 600; color: #1a1a1a; margin-bottom: 0.4rem; }
+  #login-screen p { font-size: 13px; color: #999; margin-bottom: 1.5rem; }
+  #login-screen input[type="password"] { width: 100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px; margin-bottom: 10px; outline: none; transition: border-color 0.2s; font-family: inherit; }
+  #login-screen input[type="password"]:focus { border-color: #2d7a4f; }
+  #login-screen button { width: 100%; padding: 10px; background: #2d7a4f; color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; font-family: inherit; transition: background 0.15s; }
+  #login-screen button:hover { background: #235f3d; }
+  #error-msg { font-size: 13px; color: #c03030; margin-top: 10px; min-height: 18px; }
+  #dashboard { display: none; width: 100%; min-height: 100vh; padding: 2rem 1rem; flex-direction: column; align-items: center; }
+  #dashboard.visible { display: flex; }
+  .dash-header { text-align: center; margin-bottom: 0.4rem; }
+  .dash-header h1 { font-size: 1.6rem; font-weight: 600; color: #1a1a1a; }
+  .dash-subtitle { font-size: 13px; color: #999; margin-bottom: 0.75rem; }
+  .sync-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: #2d7a4f; background: #e8f5ee; border-radius: 999px; padding: 3px 12px; margin-bottom: 2rem; }
+  .sync-dot { width: 7px; height: 7px; background: #2d7a4f; border-radius: 50%; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .section-label { font-size: 11px; font-weight: 600; color: #aaa; text-transform: uppercase; letter-spacing: 0.8px; width: 100%; max-width: 720px; margin-bottom: 8px; margin-top: 1.5rem; }
+  .sites-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; width: 100%; max-width: 720px; }
+  .site-card { background: #fff; border: 0.5px solid #ddd; border-radius: 12px; padding: 1.1rem 1rem; cursor: pointer; transition: border-color 0.15s, transform 0.1s; text-decoration: none; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+  .site-card:hover { border-color: #2d7a4f; transform: translateY(-2px); }
+  .site-icon { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+  .site-name { font-size: 13px; font-weight: 600; color: #1a1a1a; }
+  .site-desc { font-size: 12px; color: #999; line-height: 1.4; }
+  .logout-btn { margin-top: 2.5rem; font-size: 13px; color: #aaa; background: none; border: none; cursor: pointer; font-family: inherit; padding: 6px 12px; border-radius: 6px; }
+  .logout-btn:hover { background: #eee; color: #555; }
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <h1>My dashboard</h1>
+  <p>Enter your password to continue</p>
+  <input type="password" id="pwd-input" placeholder="Password" autocomplete="current-password" />
+  <button id="login-btn">Enter</button>
+  <div id="error-msg"></div>
+</div>
+
+<div id="dashboard">
+  <div class="dash-header"><h1>My dashboard</h1></div>
+  <p class="dash-subtitle">Choose where you want to go</p>
+  <div class="sync-badge"><div class="sync-dot"></div> Synced across all your devices</div>
+
+  <div class="section-label">Money & savings</div>
+  <div class="sites-grid">
+    <a class="site-card" href="savings.html" target="_blank">
+      <div class="site-icon" style="background:#e8f5ee">💰</div>
+      <div class="site-name">1000 points savings</div>
+      <div class="site-desc">Click squares to save toward 1000 points</div>
+    </a>
+    <a class="site-card" href="budget.html" target="_blank">
+      <div class="site-icon" style="background:#e8f0fe">📊</div>
+      <div class="site-name">Budget tracker</div>
+      <div class="site-desc">Log income and expenses by month</div>
+    </a>
+    <a class="site-card" href="bills.html" target="_blank">
+      <div class="site-icon" style="background:#fff4e5">🧾</div>
+      <div class="site-name">Bill reminders</div>
+      <div class="site-desc">Tick off bills as you pay them</div>
+    </a>
+    <a class="site-card" href="goals.html" target="_blank">
+      <div class="site-icon" style="background:#fce4ec">🎯</div>
+      <div class="site-name">Savings goals</div>
+      <div class="site-desc">Multiple jars for things you're saving toward</div>
+    </a>
+  </div>
+
+  <div class="section-label">Habits & goals</div>
+  <div class="sites-grid">
+    <a class="site-card" href="habits.html" target="_blank">
+      <div class="site-icon" style="background:#e8f5ee">✅</div>
+      <div class="site-name">Habit tracker</div>
+      <div class="site-desc">Tick each day you complete a habit</div>
+    </a>
+    <a class="site-card" href="weekly.html" target="_blank">
+      <div class="site-icon" style="background:#e8f0fe">📅</div>
+      <div class="site-name">Weekly goals</div>
+      <div class="site-desc">Set and check off your goals each week</div>
+    </a>
+    <a class="site-card" href="streaks.html" target="_blank">
+      <div class="site-icon" style="background:#fff8e1">🔥</div>
+      <div class="site-name">Streak counter</div>
+      <div class="site-desc">Track how many days in a row you keep a habit</div>
+    </a>
+  </div>
+
+  <div class="section-label">Notes & lists</div>
+  <div class="sites-grid">
+    <a class="site-card" href="notes.html" target="_blank">
+      <div class="site-icon" style="background:#f3e5f5">📝</div>
+      <div class="site-name">Quick notes</div>
+      <div class="site-desc">Write anything, saves automatically</div>
+    </a>
+    <a class="site-card" href="todo.html" target="_blank">
+      <div class="site-icon" style="background:#e0f7fa">☑️</div>
+      <div class="site-name">To-do list</div>
+      <div class="site-desc">Add, complete and delete tasks</div>
+    </a>
+    <a class="site-card" href="shopping.html" target="_blank">
+      <div class="site-icon" style="background:#fff3e0">🛒</div>
+      <div class="site-name">Shopping list</div>
+      <div class="site-desc">Fast checklist for every trip</div>
+    </a>
+  </div>
+
+  <button class="logout-btn" id="logout-btn">Log out</button>
+</div>
+
+<script>
+const HASH = "613943f282f2b9f22af124eaf93a8f1342265660d08636971ee308f69cd86ca9";
+const SESSION_KEY = "dash_auth";
+async function sha256(str) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
+}
+function showDashboard() {
+  document.getElementById("login-screen").style.display = "none";
+  document.getElementById("dashboard").classList.add("visible");
+}
+document.getElementById("login-btn").addEventListener("click", async () => {
+  const val = document.getElementById("pwd-input").value;
+  const hash = await sha256(val);
+  if (hash === HASH) { sessionStorage.setItem(SESSION_KEY, "1"); showDashboard(); }
+  else { document.getElementById("error-msg").textContent = "Wrong password, try again."; document.getElementById("pwd-input").value = ""; }
+});
+document.getElementById("pwd-input").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("login-btn").click(); });
+document.getElementById("logout-btn").addEventListener("click", () => { sessionStorage.removeItem(SESSION_KEY); location.reload(); });
+if (sessionStorage.getItem(SESSION_KEY) === "1") showDashboard();
+</script>
+</body>
+</html>

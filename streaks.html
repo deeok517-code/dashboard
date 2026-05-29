@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Streak counter</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',system-ui,sans-serif;background:#f5f4f0;min-height:100vh;padding:2rem 1rem}
+  h1{font-size:1.4rem;font-weight:600;color:#1a1a1a;text-align:center;margin-bottom:.2rem}.sub{font-size:13px;color:#999;text-align:center;margin-bottom:.75rem}
+  .sync-status{font-size:12px;margin-bottom:1.5rem;padding:4px 14px;border-radius:999px;display:block;text-align:center}
+  .sync-status.loading{background:#fff8e1;color:#a07000}.sync-status.saved{background:#e8f5ee;color:#2d7a4f}.sync-status.saving{background:#e8f0fe;color:#1a5fa8}.sync-status.error{background:#fdecea;color:#c03030}
+  .streaks-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;max-width:700px;margin:0 auto 1.5rem}
+  .streak-card{background:#fff;border:.5px solid #ddd;border-radius:14px;padding:1.25rem 1rem;text-align:center;position:relative}
+  .streak-card.active{border-color:#f59e0b}
+  .streak-name{font-size:14px;font-weight:600;color:#1a1a1a;margin-bottom:8px}
+  .streak-num{font-size:48px;font-weight:700;color:#f59e0b;line-height:1;margin-bottom:4px}.streak-num.zero{color:#ddd}
+  .streak-label{font-size:12px;color:#999;margin-bottom:12px}.streak-best{font-size:11px;color:#bbb;margin-bottom:12px}
+  .streak-actions{display:flex;gap:6px;justify-content:center}
+  .check-btn{background:#2d7a4f;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer;font-family:inherit}.check-btn:hover{background:#235f3d}.check-btn:disabled{background:#a3d4b8;cursor:default}
+  .reset-btn{background:none;border:1px solid #ddd;border-radius:8px;padding:7px 10px;font-size:12px;cursor:pointer;color:#999;font-family:inherit}.reset-btn:hover{border-color:#c03030;color:#c03030}
+  .del-btn{position:absolute;top:10px;right:10px;background:none;border:none;color:#ddd;cursor:pointer;font-size:18px}.del-btn:hover{color:#c03030}
+  .fire{font-size:20px}
+  .add-form{background:#fff;border:.5px solid #ddd;border-radius:10px;padding:1rem;max-width:400px;margin:0 auto;display:flex;gap:8px}
+  input[type="text"]{flex:1;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;outline:none}input:focus{border-color:#f59e0b}
+  .add-btn{background:#f59e0b;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;font-family:inherit}.add-btn:hover{background:#d97706}
+  .empty{text-align:center;color:#bbb;font-size:13px;padding:2rem 0;max-width:700px;margin:0 auto 1.5rem}
+  .overlay{position:fixed;inset:0;background:rgba(245,244,240,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;font-size:15px;color:#999}
+  .spinner{width:32px;height:32px;border:3px solid #ddd;border-top-color:#2d7a4f;border-radius:50%;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="overlay" id="overlay"><div class="spinner"></div>Loading your data…</div>
+<h1>Streak counter</h1><p class="sub">Check in daily to keep your streak alive</p>
+<div class="sync-status saved" id="sync-status">✓ Synced</div>
+<div class="streaks-grid" id="streaks-grid"></div>
+<div class="add-form"><input type="text" id="f-name" placeholder="New streak (e.g. No sugar)"/><button class="add-btn" id="add-btn">+ Add</button></div>
+<script src="sync.js"></script>
+<script>
+const TOOL='streaks';
+let streaks=[],triggerSave;
+const todayStr=()=>new Date().toISOString().slice(0,10);
+const yesterdayStr=()=>{const d=new Date();d.setDate(d.getDate()-1);return d.toISOString().slice(0,10);};
+function setSyncStatus(s){const el=document.getElementById('sync-status');const map={saving:'↑ Saving…',saved:'✓ Synced',error:'⚠ Sync failed',loading:'⟳ Loading…'};el.textContent=map[s]||s;el.className='sync-status '+s;}
+function render(){
+  const grid=document.getElementById('streaks-grid');
+  if(!streaks.length){grid.innerHTML='<div class="empty">No streaks yet — add one below</div>';return;}
+  grid.innerHTML='';
+  const today=todayStr(),yesterday=yesterdayStr();
+  streaks.forEach((s,i)=>{
+    const checkedToday=s.lastCheck===today,active=s.lastCheck===today||s.lastCheck===yesterday;
+    if(!active&&s.streak>0&&s.lastCheck&&s.lastCheck!==today&&s.lastCheck!==yesterday){s.streak=0;}
+    const card=document.createElement('div');card.className='streak-card'+(s.streak>0?' active':'');
+    card.innerHTML=`<button class="del-btn" data-i="${i}">×</button><div class="fire">${s.streak>0?'🔥':'💤'}</div><div class="streak-name">${s.name}</div><div class="streak-num ${s.streak===0?'zero':''}">${s.streak}</div><div class="streak-label">day${s.streak!==1?'s':''} in a row</div><div class="streak-best">Best: ${s.best||0} days</div><div class="streak-actions"><button class="check-btn" data-i="${i}" ${checkedToday?'disabled':''}>${checkedToday?'✓ Done today':'Check in'}</button><button class="reset-btn" data-i="${i}">Reset</button></div>`;
+    grid.appendChild(card);
+  });
+  grid.querySelectorAll('.check-btn:not(:disabled)').forEach(btn=>btn.addEventListener('click',()=>{
+    const i=parseInt(btn.dataset.i),s=streaks[i];
+    s.streak=(s.lastCheck===yesterdayStr()||!s.lastCheck)?s.streak+1:1;
+    s.lastCheck=todayStr();s.best=Math.max(s.best||0,s.streak);triggerSave();render();
+  }));
+  grid.querySelectorAll('.reset-btn').forEach(btn=>btn.addEventListener('click',()=>{
+    if(!confirm('Reset this streak to 0?'))return;
+    streaks[parseInt(btn.dataset.i)].streak=0;streaks[parseInt(btn.dataset.i)].lastCheck=null;triggerSave();render();
+  }));
+  grid.querySelectorAll('.del-btn').forEach(btn=>btn.addEventListener('click',()=>{streaks.splice(parseInt(btn.dataset.i),1);triggerSave();render();}));
+}
+document.getElementById('add-btn').addEventListener('click',()=>{
+  const name=document.getElementById('f-name').value.trim();if(!name)return;
+  streaks.push({name,streak:0,best:0,lastCheck:null});document.getElementById('f-name').value='';triggerSave();render();
+});
+document.getElementById('f-name').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('add-btn').click();});
+async function init(){
+  setSyncStatus('loading');
+  try{const d=await cloudLoad(TOOL,[]);streaks=Array.isArray(d)?d:[];setSyncStatus('saved');}catch(e){setSyncStatus('error');}
+  const ds=makeDebouncedSave(TOOL,()=>streaks);
+  triggerSave=()=>{setSyncStatus('saving');ds();setTimeout(()=>setSyncStatus('saved'),2000);};
+  render();document.getElementById('overlay').style.display='none';
+}
+init();
+</script>
+</body>
+</html>

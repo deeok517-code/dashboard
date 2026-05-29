@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Budget tracker</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f5f4f0; min-height: 100vh; padding: 2rem 1rem; }
+  h1 { font-size: 1.4rem; font-weight: 600; color: #1a1a1a; margin-bottom: 0.2rem; text-align: center; }
+  .sub { font-size: 13px; color: #999; text-align: center; margin-bottom: 0.75rem; }
+  .sync-status { font-size: 12px; margin-bottom: 1rem; padding: 4px 14px; border-radius: 999px; display: block; text-align: center; }
+  .sync-status.loading { background: #fff8e1; color: #a07000; }
+  .sync-status.saved { background: #e8f5ee; color: #2d7a4f; }
+  .sync-status.saving { background: #e8f0fe; color: #1a5fa8; }
+  .sync-status.error { background: #fdecea; color: #c03030; }
+  .month-nav { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 1.5rem; }
+  .month-nav button { background: #fff; border: 0.5px solid #ddd; border-radius: 8px; padding: 6px 14px; cursor: pointer; font-size: 14px; font-family: inherit; }
+  .month-nav button:hover { background: #f0ede8; }
+  .month-label { font-size: 15px; font-weight: 600; color: #1a1a1a; min-width: 140px; text-align: center; }
+  .summary { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; max-width: 660px; margin: 0 auto 1.5rem; }
+  .card { background: #fff; border: 0.5px solid #ddd; border-radius: 10px; padding: 12px 16px; text-align: center; }
+  .card-label { font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .card-val { font-size: 22px; font-weight: 600; }
+  .green { color: #2d7a4f; } .red { color: #c03030; } .blue { color: #1a5fa8; }
+  .form-wrap { background: #fff; border: 0.5px solid #ddd; border-radius: 12px; padding: 1.25rem; max-width: 660px; margin: 0 auto 1.5rem; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr 2fr auto; gap: 8px; align-items: center; }
+  select, input[type="text"], input[type="number"] { padding: 8px 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 13px; font-family: inherit; outline: none; width: 100%; }
+  select:focus, input:focus { border-color: #2d7a4f; }
+  .add-btn { background: #2d7a4f; color: #fff; border: none; border-radius: 8px; padding: 8px 16px; font-size: 13px; cursor: pointer; font-family: inherit; white-space: nowrap; margin-top: 10px; float: right; }
+  .add-btn:hover { background: #235f3d; }
+  .entries { max-width: 660px; margin: 0 auto; display: flex; flex-direction: column; gap: 6px; }
+  .entry { background: #fff; border: 0.5px solid #ddd; border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
+  .entry-left { display: flex; flex-direction: column; gap: 2px; }
+  .entry-cat { font-size: 11px; color: #999; }
+  .entry-desc { color: #1a1a1a; font-weight: 500; }
+  .entry-right { display: flex; align-items: center; gap: 12px; }
+  .entry-amt { font-weight: 600; font-size: 15px; }
+  .del-btn { background: none; border: none; color: #ccc; cursor: pointer; font-size: 16px; }
+  .del-btn:hover { color: #c03030; }
+  .empty { text-align: center; color: #bbb; font-size: 13px; padding: 2rem 0; }
+  .overlay { position: fixed; inset: 0; background: rgba(245,244,240,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; font-size: 15px; color: #999; }
+  .spinner { width: 32px; height: 32px; border: 3px solid #ddd; border-top-color: #2d7a4f; border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="overlay" id="overlay"><div class="spinner"></div>Loading your data…</div>
+<h1>Budget tracker</h1>
+<p class="sub">Track your income and expenses each month</p>
+<div class="sync-status saved" id="sync-status">✓ Synced</div>
+<div class="month-nav">
+  <button id="prev-btn">&#8592;</button>
+  <div class="month-label" id="month-label"></div>
+  <button id="next-btn">&#8594;</button>
+</div>
+<div class="summary">
+  <div class="card"><div class="card-label">Income</div><div class="card-val green" id="s-income">0</div></div>
+  <div class="card"><div class="card-label">Expenses</div><div class="card-val red" id="s-expenses">0</div></div>
+  <div class="card"><div class="card-label">Balance</div><div class="card-val blue" id="s-balance">0</div></div>
+</div>
+<div class="form-wrap">
+  <div class="form-row">
+    <select id="f-type"><option value="income">Income</option><option value="expense">Expense</option></select>
+    <select id="f-cat"><option>Salary</option><option>Food</option><option>Transport</option><option>Bills</option><option>Shopping</option><option>Health</option><option>Other</option></select>
+    <input type="text" id="f-desc" placeholder="Description" />
+    <input type="number" id="f-amt" placeholder="Amount" min="0" style="width:100px" />
+  </div>
+  <button class="add-btn" id="add-btn">+ Add entry</button>
+</div>
+<div class="entries" id="entries-list"></div>
+
+<script src="sync.js"></script>
+<script>
+const TOOL = 'budget';
+let data = {};
+let cur = new Date(); cur.setDate(1);
+let triggerSave;
+
+function setSyncStatus(s) {
+  const el = document.getElementById('sync-status');
+  const map = { saving: '↑ Saving…', saved: '✓ Synced', error: '⚠ Sync failed', loading: '⟳ Loading…' };
+  el.textContent = map[s] || s; el.className = 'sync-status ' + s;
+}
+
+const monthKey = () => cur.getFullYear() + '-' + String(cur.getMonth()+1).padStart(2,'0');
+const monthName = () => cur.toLocaleDateString('en-US', {month:'long', year:'numeric'});
+
+function render() {
+  document.getElementById('month-label').textContent = monthName();
+  const mk = monthKey();
+  const entries = data[mk] || [];
+  let income = 0, expense = 0;
+  entries.forEach(e => e.type === 'income' ? income += e.amt : expense += e.amt);
+  document.getElementById('s-income').textContent = income.toFixed(2);
+  document.getElementById('s-expenses').textContent = expense.toFixed(2);
+  const bal = income - expense;
+  const balEl = document.getElementById('s-balance');
+  balEl.textContent = bal.toFixed(2); balEl.className = 'card-val ' + (bal >= 0 ? 'green' : 'red');
+  const list = document.getElementById('entries-list');
+  if (!entries.length) { list.innerHTML = '<div class="empty">No entries yet for this month</div>'; return; }
+  list.innerHTML = '';
+  [...entries].reverse().forEach((e, ri) => {
+    const i = entries.length - 1 - ri;
+    const div = document.createElement('div'); div.className = 'entry';
+    div.innerHTML = `<div class="entry-left"><div class="entry-cat">${e.type} · ${e.cat}</div><div class="entry-desc">${e.desc||'—'}</div></div>
+    <div class="entry-right"><span class="entry-amt ${e.type==='income'?'green':'red'}">${e.type==='income'?'+':'-'}${e.amt.toFixed(2)}</span>
+    <button class="del-btn" data-i="${i}">×</button></div>`;
+    list.appendChild(div);
+  });
+  list.querySelectorAll('.del-btn').forEach(btn => btn.addEventListener('click', () => {
+    data[mk].splice(parseInt(btn.dataset.i),1); triggerSave(); render();
+  }));
+}
+
+document.getElementById('add-btn').addEventListener('click', () => {
+  const amt = parseFloat(document.getElementById('f-amt').value);
+  if (!amt || amt <= 0) return;
+  const mk = monthKey();
+  if (!data[mk]) data[mk] = [];
+  data[mk].push({ type: document.getElementById('f-type').value, cat: document.getElementById('f-cat').value, desc: document.getElementById('f-desc').value, amt });
+  document.getElementById('f-amt').value = ''; document.getElementById('f-desc').value = '';
+  triggerSave(); render();
+});
+
+document.getElementById('prev-btn').addEventListener('click', () => { cur.setMonth(cur.getMonth()-1); render(); });
+document.getElementById('next-btn').addEventListener('click', () => { cur.setMonth(cur.getMonth()+1); render(); });
+
+async function init() {
+  setSyncStatus('loading');
+  try { data = await cloudLoad(TOOL, {}); setSyncStatus('saved'); } catch(e) { setSyncStatus('error'); }
+  const ds = makeDebouncedSave(TOOL, () => data);
+  triggerSave = () => { setSyncStatus('saving'); ds(); setTimeout(() => setSyncStatus('saved'), 2000); };
+  render(); document.getElementById('overlay').style.display = 'none';
+}
+init();
+</script>
+</body>
+</html>

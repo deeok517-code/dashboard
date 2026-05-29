@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Weekly goals</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',system-ui,sans-serif;background:#f5f4f0;min-height:100vh;padding:2rem 1rem;display:flex;flex-direction:column;align-items:center}
+  h1{font-size:1.4rem;font-weight:600;color:#1a1a1a;margin-bottom:.2rem}.sub{font-size:13px;color:#999;margin-bottom:.75rem}
+  .sync-status{font-size:12px;margin-bottom:1rem;padding:4px 14px;border-radius:999px;display:inline-block}
+  .sync-status.loading{background:#fff8e1;color:#a07000}.sync-status.saved{background:#e8f5ee;color:#2d7a4f}.sync-status.saving{background:#e8f0fe;color:#1a5fa8}.sync-status.error{background:#fdecea;color:#c03030}
+  .week-nav{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:1.5rem}
+  .week-nav button{background:#fff;border:.5px solid #ddd;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:14px;font-family:inherit}.week-nav button:hover{background:#f0ede8}
+  .week-label{font-size:14px;font-weight:600;color:#1a1a1a;min-width:200px;text-align:center}
+  .wrap{width:100%;max-width:500px}
+  .progress-bar-wrap{background:#e0ded8;border-radius:999px;height:8px;margin-bottom:6px;overflow:hidden}
+  .progress-bar{height:100%;background:#2d7a4f;border-radius:999px;transition:width .3s}
+  .stat-row{display:flex;justify-content:space-between;font-size:13px;color:#999;margin-bottom:1rem}.stat-row span{font-weight:600;color:#1a1a1a}
+  .goal-item{background:#fff;border:.5px solid #ddd;border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:12px;margin-bottom:8px;cursor:pointer}
+  .goal-item.done{background:#f0faf4;border-color:#a3d4b8}
+  .check{width:22px;height:22px;border-radius:50%;border:1.5px solid #ccc;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px}
+  .goal-item.done .check{background:#2d7a4f;border-color:#2d7a4f;color:#fff}
+  .goal-text{flex:1;font-size:14px;font-weight:500;color:#1a1a1a}.goal-item.done .goal-text{text-decoration:line-through;color:#999}
+  .del-btn{background:none;border:none;color:#ddd;cursor:pointer;font-size:18px}.del-btn:hover{color:#c03030}
+  .add-form{background:#fff;border:.5px solid #ddd;border-radius:10px;padding:1rem;margin-top:1rem;display:flex;gap:8px}
+  input[type="text"]{flex:1;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;outline:none}input:focus{border-color:#2d7a4f}
+  .add-btn{background:#2d7a4f;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;font-family:inherit}.add-btn:hover{background:#235f3d}
+  .empty{text-align:center;color:#bbb;font-size:13px;padding:1.5rem 0}
+  .overlay{position:fixed;inset:0;background:rgba(245,244,240,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;font-size:15px;color:#999}
+  .spinner{width:32px;height:32px;border:3px solid #ddd;border-top-color:#2d7a4f;border-radius:50%;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="overlay" id="overlay"><div class="spinner"></div>Loading your data…</div>
+<h1>Weekly goals</h1><p class="sub">Set your goals for the week and tick them off</p>
+<div class="sync-status saved" id="sync-status">✓ Synced</div>
+<div class="week-nav"><button id="prev-btn">&#8592;</button><div class="week-label" id="week-label"></div><button id="next-btn">&#8594;</button></div>
+<div class="wrap">
+  <div class="stat-row">Completed: <span id="stat-done">0 / 0</span></div>
+  <div class="progress-bar-wrap"><div class="progress-bar" id="prog-bar" style="width:0%"></div></div>
+  <div id="goals-list"></div>
+  <div class="add-form"><input type="text" id="f-goal" placeholder="Add a goal for this week…"/><button class="add-btn" id="add-btn">+ Add</button></div>
+</div>
+<script src="sync.js"></script>
+<script>
+const TOOL='weekly';
+let data={},triggerSave;
+function setSyncStatus(s){const el=document.getElementById('sync-status');const map={saving:'↑ Saving…',saved:'✓ Synced',error:'⚠ Sync failed',loading:'⟳ Loading…'};el.textContent=map[s]||s;el.className='sync-status '+s;}
+function getMonday(d){const dt=new Date(d),day=dt.getDay(),diff=dt.getDate()-day+(day===0?-6:1);dt.setDate(diff);dt.setHours(0,0,0,0);return dt;}
+let curMonday=getMonday(new Date());
+const weekKey=m=>m.getFullYear()+'-'+String(m.getMonth()+1).padStart(2,'0')+'-'+String(m.getDate()).padStart(2,'0');
+const weekLabel=m=>{const end=new Date(m);end.setDate(m.getDate()+6);const fmt=d=>d.toLocaleDateString('en-US',{month:'short',day:'numeric'});return fmt(m)+' — '+fmt(end);};
+function render(){
+  document.getElementById('week-label').textContent=weekLabel(curMonday);
+  const wk=weekKey(curMonday);if(!data[wk])data[wk]=[];
+  const goals=data[wk],total=goals.length,done=goals.filter(g=>g.done).length;
+  document.getElementById('stat-done').textContent=done+' / '+total;
+  document.getElementById('prog-bar').style.width=total?Math.round(done/total*100)+'%':'0%';
+  const list=document.getElementById('goals-list');
+  if(!goals.length){list.innerHTML='<div class="empty">No goals yet for this week</div>';return;}
+  list.innerHTML='';
+  goals.forEach((g,i)=>{
+    const div=document.createElement('div');div.className='goal-item'+(g.done?' done':'');
+    div.innerHTML=`<div class="check">${g.done?'✓':''}</div><div class="goal-text">${g.text}</div><button class="del-btn" data-i="${i}">×</button>`;
+    div.addEventListener('click',e=>{if(e.target.classList.contains('del-btn'))return;g.done=!g.done;triggerSave();render();});
+    div.querySelector('.del-btn').addEventListener('click',e=>{e.stopPropagation();goals.splice(i,1);triggerSave();render();});
+    list.appendChild(div);
+  });
+}
+document.getElementById('add-btn').addEventListener('click',()=>{
+  const text=document.getElementById('f-goal').value.trim();if(!text)return;
+  const wk=weekKey(curMonday);if(!data[wk])data[wk]=[];
+  data[wk].push({text,done:false});document.getElementById('f-goal').value='';triggerSave();render();
+});
+document.getElementById('f-goal').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('add-btn').click();});
+document.getElementById('prev-btn').addEventListener('click',()=>{curMonday.setDate(curMonday.getDate()-7);render();});
+document.getElementById('next-btn').addEventListener('click',()=>{curMonday.setDate(curMonday.getDate()+7);render();});
+async function init(){
+  setSyncStatus('loading');
+  try{data=await cloudLoad(TOOL,{});setSyncStatus('saved');}catch(e){setSyncStatus('error');}
+  const ds=makeDebouncedSave(TOOL,()=>data);
+  triggerSave=()=>{setSyncStatus('saving');ds();setTimeout(()=>setSyncStatus('saved'),2000);};
+  render();document.getElementById('overlay').style.display='none';
+}
+init();
+</script>
+</body>
+</html>
